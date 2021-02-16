@@ -33,7 +33,7 @@ impl Player {
                 self.state == PlayerState::Alive && self.has_charges_for(choice)
             },
             _ => {
-                self.has_charges_for(choice)
+                self.state != PlayerState::Dead && self.has_charges_for(choice)
             }
         }
     }
@@ -106,6 +106,23 @@ impl Player {
 
         assert_eq!(player.can_do_move(Move::SuperSaiyan), true);
         assert_eq!(player.can_do_move(Move::SpecialBeam{target: 2}), false);
+    }
+
+    #[test]
+    fn dead_cant_move() {
+        let mut player = Player::new(1, "Jonny".to_string());
+
+        player.move_completed(Move::Charge); // charges : 1
+        player.move_completed(Move::Charge); // charges : 2
+        player.move_completed(Move::Charge); // charges : 3
+
+        player.kill();
+
+        assert_eq!(player.state, PlayerState::Dead);
+
+        assert_eq!(player.can_do_move(Move::Kamehameha{target: 2}), false);
+        assert_eq!(player.can_do_move(Move::Charge), false);
+        assert_eq!(player.can_do_move(Move::Block), false);
     }
 
     #[test]
