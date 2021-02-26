@@ -65,6 +65,10 @@ impl Player {
         }
     }
 
+    pub fn is_dead(&self) -> bool {
+        self.state == PlayerState::Dead
+    }
+
     fn charge(&mut self) {
         match self.state {
             PlayerState::Alive => {

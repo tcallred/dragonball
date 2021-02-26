@@ -20,6 +20,15 @@ pub struct PlayerMove {
     pub choice: Move,
 }
 
+impl PlayerMove {
+    pub fn new(player: PlayerId, choice: Move) -> Self {
+        Self {
+            player,
+            choice
+        }
+    }
+}
+
 impl Move {
     pub fn cost(&self) -> Charges {
         use Move::*;
