@@ -6,9 +6,10 @@ pub type PlayerId = u32;
 enum PlayerState {
     Alive,
     SuperSaiyan,
-    Dead
+    Dead,
 }
 
+#[derive(Clone)]
 pub struct Player {
     pub id: PlayerId,
     pub nickname: String,
@@ -22,19 +23,14 @@ impl Player {
             id,
             nickname,
             charges: 0,
-            state: PlayerState::Alive
+            state: PlayerState::Alive,
         }
     }
 
-
     pub fn can_do_move(&self, choice: Move) -> bool {
         match choice {
-            Move::SuperSaiyan => {
-                self.state == PlayerState::Alive && self.has_charges_for(choice)
-            },
-            _ => {
-                self.state != PlayerState::Dead && self.has_charges_for(choice)
-            }
+            Move::SuperSaiyan => self.state == PlayerState::Alive && self.has_charges_for(choice),
+            _ => self.state != PlayerState::Dead && self.has_charges_for(choice),
         }
     }
 
@@ -43,11 +39,11 @@ impl Player {
         match choice {
             Move::Charge => {
                 self.charge();
-            },
+            }
             Move::SuperSaiyan => {
                 self.state = PlayerState::SuperSaiyan;
-            },
-            _ => ()
+            }
+            _ => (),
         }
         self.deduct_charges(choice.cost());
     }
@@ -55,13 +51,13 @@ impl Player {
     pub fn kill(&mut self) {
         match self.state {
             PlayerState::SuperSaiyan => {
-                self.state = PlayerState::Alive; 
-            },
+                self.state = PlayerState::Alive;
+            }
             PlayerState::Alive => {
                 self.state = PlayerState::Dead;
                 self.charges = 0;
             }
-            _ => ()
+            _ => (),
         }
     }
 
@@ -77,7 +73,7 @@ impl Player {
             PlayerState::SuperSaiyan => {
                 self.charges += 2;
             }
-            _ => ()
+            _ => (),
         }
     }
 
@@ -87,11 +83,11 @@ impl Player {
 
     fn deduct_charges(&mut self, ammount: Charges) {
         self.charges -= ammount;
-    } 
+    }
 }
 
-
-#[cfg(test)] mod tests {
+#[cfg(test)]
+mod tests {
     use std::assert_eq;
 
     use super::*;
@@ -99,17 +95,17 @@ impl Player {
     fn can_do_with_n_charges() {
         let mut player = Player::new(1, "Jonny".to_string());
 
-        assert_eq!(player.can_do_move(Move::Kamehameha{target: 2}), false);
+        assert_eq!(player.can_do_move(Move::Kamehameha { target: 2 }), false);
 
         player.move_completed(Move::Charge); // charges : 1
 
-        assert_eq!(player.can_do_move(Move::Kamehameha{target: 2}), true);
+        assert_eq!(player.can_do_move(Move::Kamehameha { target: 2 }), true);
 
         player.move_completed(Move::Charge); // charges : 2
         player.move_completed(Move::Charge); // charges : 3
 
         assert_eq!(player.can_do_move(Move::SuperSaiyan), true);
-        assert_eq!(player.can_do_move(Move::SpecialBeam{target: 2}), false);
+        assert_eq!(player.can_do_move(Move::SpecialBeam { target: 2 }), false);
     }
 
     #[test]
@@ -124,7 +120,7 @@ impl Player {
 
         assert_eq!(player.state, PlayerState::Dead);
 
-        assert_eq!(player.can_do_move(Move::Kamehameha{target: 2}), false);
+        assert_eq!(player.can_do_move(Move::Kamehameha { target: 2 }), false);
         assert_eq!(player.can_do_move(Move::Charge), false);
         assert_eq!(player.can_do_move(Move::Block), false);
     }
@@ -170,7 +166,7 @@ impl Player {
         let mut player = Player::new(1, "Jonny".to_string());
 
         player.move_completed(Move::Charge); // charges : 1
-        
+
         assert_eq!(player.state, PlayerState::Alive);
         assert_eq!(player.charges, 1);
 
@@ -192,7 +188,7 @@ impl Player {
 
         assert_eq!(player.charges, 5);
 
-        player.move_completed(Move::SpecialBeam{target: 2}); // charges : 0
+        player.move_completed(Move::SpecialBeam { target: 2 }); // charges : 0
 
         assert_eq!(player.charges, 0);
     }
@@ -215,7 +211,7 @@ impl Player {
         player.move_completed(Move::Charge); // charges : 2
         player.move_completed(Move::Charge); // charges : 6
 
-        player.move_completed(Move::SpecialBeam{target: 2}); // charges : 1
+        player.move_completed(Move::SpecialBeam { target: 2 }); // charges : 1
 
         assert_eq!(player.charges, 1);
     }

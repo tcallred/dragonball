@@ -1,17 +1,18 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    moves::PlayerMove,
+    moves::Move,
     player::{Player, PlayerId},
 };
 
 pub type GameId = u32;
 type GamePlayers = HashMap<PlayerId, Player>;
 
+#[derive(PartialEq, Debug)]
 enum GameState {
     Setup,
     Playing,
-    Ended {winner: PlayerId},
+    Ended { winner: PlayerId },
 }
 
 struct Game {
@@ -29,117 +30,139 @@ impl Game {
         }
     }
 
-    pub fn add_player(&mut self, player: Player) {
+    pub fn add_player(mut self, player: Player) -> Self {
         self.players.insert(player.id, player);
+        self
     }
 
     pub fn start_game(&mut self) {
         self.game_state = GameState::Playing;
     }
 
-    pub fn process_round(&mut self, moves: &HashMap<PlayerId, PlayerMove>) {
-
-        // TODO: Handle spirit bomb
-
+    pub fn process_turn(&mut self, moves: &HashMap<PlayerId, Move>) {
+        for (player, player_move) in moves {
+            self.players
+                .get_mut(player)
+                .unwrap()
+                .move_completed(*player_move);
+        }
+        let players: &GamePlayers = &self.players;
         // Make list of players who should die this round
         let players_to_kill: HashSet<PlayerId> = moves
             .iter()
-            .map(|(_, player_move)| player_killed_by(player_move, moves))
-            .filter_map(|player_id| player_id)
-            .collect();
+            .map(|(player, player_move)| result_of_player_move(player, player_move, moves))
+            .fold(
+                HashSet::new(),
+                |mut killed_set, move_result| match move_result {
+                    MoveResult::NoKill => killed_set,
+                    MoveResult::Kill(player) => {
+                        killed_set.insert(player);
+                        killed_set
+                    }
+                    MoveResult::AllKill { attacker } => {
+                        for player in players.keys() {
+                            if *player != attacker {
+                                killed_set.insert(*player);
+                            }
+                        }
+                        killed_set
+                    }
+                },
+            );
 
         // Kill players who should die
         for player_id in players_to_kill.iter() {
-            if let Some(player) = self.players.get_mut(player_id){
+            if let Some(player) = self.players.get_mut(player_id) {
                 player.kill();
             }
         }
 
         // Check for a winner
         if let Some(winner) = get_winner(&self.players) {
-            self.game_state = GameState::Ended{winner};
+            self.game_state = GameState::Ended { winner };
         }
-
     }
 }
 
-fn player_killed_by(
-    player_move: &PlayerMove,
-    moves: &HashMap<PlayerId, PlayerMove>,
-) -> Option<PlayerId> {
-    use crate::moves::Move::*;
+enum MoveResult {
+    NoKill,
+    Kill(PlayerId),
+    AllKill { attacker: PlayerId },
+}
 
-    match player_move.choice {
+fn result_of_player_move(
+    player: &PlayerId,
+    player_move: &Move,
+    moves: &HashMap<PlayerId, Move>,
+) -> MoveResult {
+    use crate::moves::Move::*;
+    use MoveResult::*;
+
+    match player_move {
         Kamehameha { target } => {
-            let targets_move = moves.get(&target).unwrap().choice;
+            let targets_move = moves.get(target).unwrap();
             match targets_move {
-                Charge => Some(target),
-                SuperSaiyan => Some(target),
-                Reflect {
-                    target: reflect_target,
-                } => player_killed_by(
-                    &PlayerMove::new(
-                        target,
-                        Kamehameha {
-                            target: reflect_target,
-                        },
-                    ),
-                    moves,
-                ),
-                _ => None,
+                Charge => Kill(*target),
+                Kamehameha { target } => {
+                    if *player == *target {
+                        NoKill
+                    } else {
+                        Kill(*target)
+                    }
+                }
+                SuperSaiyan => Kill(*target),
+                Reflect => Kill(*player),
+                _ => NoKill,
             }
         }
 
         Disk { target } => {
-            let targets_move = moves.get(&target).unwrap().choice;
+            let targets_move = moves.get(target).unwrap();
             match targets_move {
-                Charge => Some(target),
-                Kamehameha { target: _ } => Some(target),
-                SuperSaiyan => Some(target),
-                Reflect {
-                    target: reflect_target,
-                } => player_killed_by(
-                    &PlayerMove::new(
-                        target,
-                        Disk {
-                            target: reflect_target,
-                        },
-                    ),
-                    moves,
-                ),
-                _ => None,
+                Charge => Kill(*target),
+                Kamehameha { target: _ } => Kill(*target),
+                Disk { target } => {
+                    if *player == *target {
+                        NoKill
+                    } else {
+                        Kill(*target)
+                    }
+                }
+                SuperSaiyan => Kill(*target),
+                Reflect => Kill(*player),
+                _ => NoKill,
             }
         }
 
         SpecialBeam { target } => {
-            let targets_move = moves.get(&target).unwrap().choice;
+            let targets_move = moves.get(target).unwrap();
             match targets_move {
-                Charge => Some(target),
-                Block => Some(target),
-                Kamehameha{target: _} => Some(target),
-                Disk{target:_} => Some(target),
-                SuperSaiyan => Some(target),
-                Reflect {
-                    target: reflect_target,
-                } => player_killed_by(
-                    &PlayerMove::new(
-                        target,
-                        SpecialBeam {
-                            target: reflect_target,
-                        },
-                    ),
-                    moves,
-                ),
-                _ => None
+                Charge => Kill(*target),
+                Block => Kill(*target),
+                Kamehameha { target: _ } => Kill(*target),
+                Disk { target: _ } => Kill(*target),
+                SuperSaiyan => Kill(*target),
+                Reflect => Kill(*player),
+                SpecialBeam { target } => {
+                    if *player == *target {
+                        NoKill
+                    } else {
+                        Kill(*target)
+                    }
+                }
+                _ => NoKill,
             }
         }
-        _ => None,
+
+        SpiritBomb => AllKill { attacker: *player },
+
+        _ => NoKill,
     }
 }
 
-
 fn get_winner(players: &GamePlayers) -> Option<PlayerId> {
-    let alive: Vec<PlayerId> = players.iter()
+    let alive: Vec<PlayerId> = players
+        .iter()
         .map(|(_, player)| player)
         .filter(|player| !player.is_dead())
         .map(|player| player.id)
@@ -147,8 +170,34 @@ fn get_winner(players: &GamePlayers) -> Option<PlayerId> {
 
     if alive.len() == 1 {
         Some(alive[0])
-    }
-    else {
+    } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::assert_eq;
+
+    use super::*;
+    use crate::{
+        moves::Move,
+        player::{Player, PlayerId},
+    };
+    #[test]
+    fn two_players_one_killed_by_kamehameha() {
+        let john = Player::new(1, "John".to_string());
+        let mark = Player::new(2, "Mark".to_string());
+        let mut game = Game::new(1234)
+            .add_player(john.clone())
+            .add_player(mark.clone());
+        let turn1 = HashMap::from([(john.id, Move::Charge), (mark.id, Move::Charge)]);
+        game.process_turn(&turn1);
+        let turn2 = HashMap::from([
+            (john.id, Move::Kamehameha { target: mark.id }),
+            (mark.id, Move::Charge),
+        ]);
+        game.process_turn(&turn2);
+        assert_eq!(game.game_state, GameState::Ended { winner: john.id });
     }
 }
