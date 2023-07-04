@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 pub mod player;
 pub mod game;
 pub mod moves;
