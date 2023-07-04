@@ -70,14 +70,15 @@ impl Game {
                 },
             );
 
-        // Kill players who should die
+        // Kill players who should die or complete moves
         self.players = self.players
             .into_iter()
             .map(|(key, player)| {
+                let player_move = moves.get(&player.id).unwrap().to_owned();
                 if players_to_kill.contains(&player.id) {
                     (key, player.kill())
                 } else {
-                    (key, player)
+                    (key, player.move_completed(player_move))
                 }
             })
             .collect();
